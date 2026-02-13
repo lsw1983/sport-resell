@@ -20,12 +20,13 @@ import {
 } from 'firebase/firestore';
 
 /**
- * ФИНАЛЬНАЯ ВЕРСИЯ ДЛЯ VERCEL
- * Без лишних системных переменных.
+ * PRODUCTION-READY VERSION
+ * Полностью удалены системные переменные чата для успешного билда в Vercel.
  */
 
 // --- ШАГ 1: НАСТРОЙКА FIREBASE ---
-// Скопируйте данные из Firebase Console -> Project Settings -> General -> Your Apps
+// Чтобы база данных заработала на твоем сайте, 
+// зайди в Firebase Console -> Project Settings и скопируй свой объект конфига сюда.
 const firebaseConfig = {
   apiKey: "ВАШ_API_KEY",
   authDomain: "ВАШ_PROJECT_ID.firebaseapp.com",
@@ -35,12 +36,13 @@ const firebaseConfig = {
   appId: "ВАШ_APP_ID"
 };
 
-// Проверка конфига перед инициализацией
-const isConfigValid = firebaseConfig.apiKey && firebaseConfig.apiKey !== "ВАШ_API_KEY";
-const app = isConfigValid ? initializeApp(firebaseConfig) : null;
+// Инициализируем Firebase только если ключи заменены пользователем
+const isConfigProvided = firebaseConfig.apiKey && firebaseConfig.apiKey !== "ВАШ_API_KEY";
+const app = isConfigProvided ? initializeApp(firebaseConfig) : null;
 const auth = app ? getAuth(app) : null;
 const db = app ? getFirestore(app) : null;
 
+// Уникальный ID вашего приложения для хранения данных в Firestore
 const currentAppId = 'sport-resell-v1';
 
 const MOCK_PRODUCTS = [
@@ -51,7 +53,7 @@ const MOCK_PRODUCTS = [
     category: "Бег",
     price: 18500,
     images: ["https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&q=80&w=800"],
-    description: "Пробег 15 км. Не подошли. Состояние 5/5.",
+    description: "Пробег 15 км. Не подошли. Состояние 5/5. Оригинал.",
     createdAt: Date.now() - 500000,
   },
   {
@@ -61,7 +63,7 @@ const MOCK_PRODUCTS = [
     category: "ВЕЛО",
     price: 12000,
     images: ["https://images.unsplash.com/photo-1596435308018-774f76269661?auto=format&fit=crop&q=80&w=800"],
-    description: "Топовый шлем, размер М. Использовал полсезона.",
+    description: "Топовый шлем, размер М. Использовал полсезона. Без падений.",
     createdAt: Date.now() - 1000000
   }
 ];
@@ -78,21 +80,24 @@ export default function App() {
   const [newDesc, setNewDesc] = useState("");
   const [newPrice, setNewPrice] = useState("");
   const [newCategory, setNewCategory] = useState("Бег");
+  const [newImages, setNewImages] = useState([]);
   const [aiLoading, setAiLoading] = useState(false);
 
   const categories = ["Все", "Бег", "ВЕЛО"];
 
+  // Инициализация авторизации (только анонимно для начала)
   useEffect(() => {
     if (!auth) return;
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
-        signInAnonymously(auth).catch(() => {});
+        signInAnonymously(auth).catch(err => console.error("Anonymous auth failed", err));
       }
       setUser(currentUser);
     });
     return () => unsubscribe();
   }, []);
 
+  // Синхронизация с Firestore
   useEffect(() => {
     if (!db || !user) return;
     const productsRef = collection(db, 'artifacts', currentAppId, 'public', 'data', 'products');
@@ -103,7 +108,7 @@ export default function App() {
         const unique = combined.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
         return unique.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       });
-    }, (error) => console.error("Firestore error:", error));
+    }, (error) => console.error("Firestore sync error:", error));
     return () => unsubscribe();
   }, [user]);
 
@@ -123,7 +128,7 @@ export default function App() {
       });
       setIsModalOpen(false);
       setNewTitle(""); setNewDesc(""); setNewPrice("");
-    } catch (err) { console.error("Error:", err); }
+    } catch (err) { console.error("Error adding doc:", err); }
   };
 
   const filteredProducts = useMemo(() => {
@@ -149,7 +154,7 @@ export default function App() {
             <input 
               type="text"
               placeholder="Поиск..."
-              className="w-full bg-gray-100 rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none border-none"
+              className="w-full bg-gray-100 rounded-2xl py-3 pl-12 pr-4 text-sm focus:outline-none border-none shadow-inner"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -158,11 +163,11 @@ export default function App() {
       </header>
 
       <main className="max-w-2xl mx-auto mt-6 px-4">
-        {!isConfigValid && (
+        {!isConfigProvided && (
           <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-[24px] flex items-start gap-3 shadow-sm">
             <Info className="w-5 h-5 text-orange-600 shrink-0" />
             <p className="text-[11px] text-orange-800 font-bold leading-tight">
-              Сайт готов! Чтобы заработала база данных, вставьте ключи из Firebase Console в src/App.js.
+              Сайт запущен! Чтобы товары сохранялись, вставьте свои ключи Firebase в src/App.js.
             </p>
           </div>
         )}
@@ -174,8 +179,8 @@ export default function App() {
               onClick={() => setSelectedCategory(cat)}
               className={`px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${
                 selectedCategory === cat 
-                ? "bg-blue-600 text-white shadow-xl" 
-                : "bg-white text-gray-500 border border-gray-50"
+                ? "bg-blue-600 text-white shadow-xl shadow-blue-200" 
+                : "bg-white text-gray-500 border border-gray-50 hover:bg-gray-100"
               }`}
             >
               {cat}
@@ -254,7 +259,7 @@ export default function App() {
               <div className="grid grid-cols-2 gap-10">
                 <div className="space-y-4">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Категория</label>
-                  <select className="w-full bg-gray-50 p-6 rounded-[32px] font-black border border-gray-100" value={newCategory} onChange={(e) => setNewCategory(e.target.value)}>
+                  <select className="w-full bg-gray-50 p-6 rounded-[32px] font-black border border-gray-100 appearance-none outline-none" value={newCategory} onChange={(e) => setNewCategory(e.target.value)}>
                     <option value="Бег">🏃 Бег</option>
                     <option value="ВЕЛО">🚲 ВЕЛО</option>
                   </select>
@@ -269,6 +274,21 @@ export default function App() {
                 Опубликовать
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {isProfileOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6" onClick={() => setIsProfileOpen(false)}>
+          <div className="bg-white w-full max-w-sm rounded-[56px] p-12 text-center" onClick={e => e.stopPropagation()}>
+            <div className="w-24 h-24 bg-blue-50 rounded-[40px] flex items-center justify-center mx-auto mb-8 shadow-inner">
+              <Ghost className="w-10 h-10 text-blue-600" />
+            </div>
+            <h2 className="text-3xl font-black text-gray-900 mb-2 tracking-tighter uppercase">Атлет</h2>
+            <p className="text-gray-400 text-sm mb-10 font-bold tracking-widest uppercase">Гостевой доступ</p>
+            <button onClick={() => setIsProfileOpen(false)} className="w-full bg-blue-600 text-white py-5 rounded-[28px] font-black uppercase text-xs tracking-[0.2em]">
+              Закрыть
+            </button>
           </div>
         </div>
       )}
